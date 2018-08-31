@@ -22,6 +22,8 @@ testString = "## Sub-heading\n\
 \\n\
 \Horizontal rule:\n\
 \\n\
+\------\n\
+\\n\
 \1. Apple\n\
 \2. Banana"
 
@@ -39,7 +41,7 @@ startParsing = do
 -- This part can be extended, for example by adding a function for bullet lists. I would argue, that it makes sense to
 -- test at last for paragraphs.
 parseMD :: Parsec String () String
-parseMD = intercalate "\n"  <$> ((parseHeader <|> parseList <|> parseParagraph <|> many anyChar) `sepBy` newline)
+parseMD = intercalate "\n"  <$> ((parseHeader <|> parseList <|> parseHorizontal <|> parseParagraph <|> many anyChar) `sepBy` newline)
 
 -- Is the current line a header
 parseHeader :: Parsec String () String
@@ -88,7 +90,7 @@ parseParagraph = do
 readParInput :: Parsec String () String
 readParInput = do
         content <- concat <$> many1 (many1 (noneOf "\n*`_ ") <|> parseAttribute <|> parseWhitespace)
-        nextLine <- try (do newline; lookAhead newline; return "\n") <|> (do lookAhead (char '\n'); newline; readParInput >>= (\tmp -> return ('\n':tmp))) <|> return ""
+        nextLine <- try (do newline; lookAhead newline; return "\n") <|> (do lookAhead newline; newline; readParInput >>= (\tmp -> return ('\n':tmp))) <|> return ""
         return (content ++ nextLine)
 
 parseWhitespace :: Parsec String () String
@@ -115,3 +117,7 @@ parseAttribute' tag = do
                 | s == "strong" = '*'
                 | s == "em" = '_'
                 | otherwise      = '`'
+
+
+parseHorizontal :: Parsec String () String
+parseHorizontal = many1 (char '-') >> lookAhead newline >> newline >> return "<hr />"

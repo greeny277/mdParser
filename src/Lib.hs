@@ -1,6 +1,6 @@
 module Lib where
 
-import Text.ParserCombinators.Parsec
+import Text.ParserCombinators.Parsec hiding (try)
 import Text.Parsec.Prim
 import Text.Parsec.Char
 import Control.Monad (void)
@@ -49,9 +49,10 @@ parseParagraph = do
 -- a parapgraph.
 readParInput :: Parsec String () String
 readParInput = do
-        content <- concat <$> many1 (many1 (noneOf "\n*`_") <|> parseAttribute)
-        nextLine <- Text.Parsec.Prim.try (do char '\n'; char '\n'; newline; return "") <|> (do lookAhead (char '\n'); newline; readParInput >>= (\tmp -> return ('\n':tmp))) <|> return ""
+        content <- concat <$> many1 (many1 (noneOf "\n*`_ ") <|> parseAttribute)
+        nextLine <- try (do char '\n'; char '\n'; newline; return "") <|> (do lookAhead (char '\n'); newline; readParInput >>= (\tmp -> return ('\n':tmp))) <|> return ""
         return (content ++ nextLine)
+
 
 
 -- Parse any of the three given attributes

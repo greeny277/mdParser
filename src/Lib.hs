@@ -7,14 +7,27 @@ import Control.Monad (void)
 
 -- Some test strings
 emptyTestString = ""
-testString = "Subsection"
+testString = "## Sub-heading\n\
+\n\
+\ Paragraphs are separated \n\
+\ by a blank line. \n\
+\\n\
+\\n\
+\Two spaces at the end of a line  \n\
+\produces a line break.\n\
+\\n\
+\Text attributes _italic_,\n\
+\**bold**, `monospace`.\n\
+\\n\
+\Horizontal rule:"
+
 javaTestString = "## Sub-heading\n### Sub-sub-Heading\n\n**paragpraph**  \nfoooo";
 
 
 -- Start the parsing procedure
 startParsing :: IO ()
 startParsing = do
-        let r =  parse parseMD "" javaTestString
+        let r =  parse parseMD "" testString
         case r of
             Left _  -> putStrLn "Parsing went wrong"
             Right h -> putStrLn h
@@ -50,7 +63,7 @@ parseParagraph = do
 readParInput :: Parsec String () String
 readParInput = do
         content <- concat <$> many1 (many1 (noneOf "\n*`_ ") <|> parseAttribute <|> parseWhitespace)
-        nextLine <- try (do char '\n'; char '\n'; newline; return "") <|> (do lookAhead (char '\n'); newline; readParInput >>= (\tmp -> return ('\n':tmp))) <|> return ""
+        nextLine <- try (do newline; lookAhead newline; return "\n") <|> (do lookAhead (char '\n'); newline; readParInput >>= (\tmp -> return ('\n':tmp))) <|> return ""
         return (content ++ nextLine)
 
 
@@ -58,7 +71,7 @@ readParInput = do
 parseWhitespace :: Parsec String () String
 parseWhitespace =
         let checkForBr = char ' ' >> char ' ' >> newline
-            in (checkForBr >> return "< /br>") <|> (char ' ' >> return " ")
+            in try (checkForBr >> return "< /br>") <|> (char ' ' >> return " ")
 
 
 -- Parse any of the three given attributes

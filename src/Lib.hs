@@ -8,7 +8,7 @@ import Control.Monad (void)
 -- Some test strings
 emptyTestString = ""
 testString = "Subsection"
-javaTestString = "## Sub-heading\n### Sub-sub-Heading\n\n**paragpraph**\nfoooo";
+javaTestString = "## Sub-heading\n### Sub-sub-Heading\n\n**paragpraph**  \nfoooo";
 
 
 -- Start the parsing procedure
@@ -49,10 +49,16 @@ parseParagraph = do
 -- a parapgraph.
 readParInput :: Parsec String () String
 readParInput = do
-        content <- concat <$> many1 (many1 (noneOf "\n*`_ ") <|> parseAttribute)
+        content <- concat <$> many1 (many1 (noneOf "\n*`_ ") <|> parseAttribute <|> parseWhitespace)
         nextLine <- try (do char '\n'; char '\n'; newline; return "") <|> (do lookAhead (char '\n'); newline; readParInput >>= (\tmp -> return ('\n':tmp))) <|> return ""
         return (content ++ nextLine)
 
+
+
+parseWhitespace :: Parsec String () String
+parseWhitespace =
+        let checkForBr = char ' ' >> char ' ' >> newline
+            in (checkForBr >> return "< /br>") <|> (char ' ' >> return " ")
 
 
 -- Parse any of the three given attributes

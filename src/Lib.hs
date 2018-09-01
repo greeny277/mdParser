@@ -9,7 +9,7 @@ import Data.List (intercalate)
 -- Some test strings
 emptyTestString = ""
 testString = "## Sub-heading\n\
-\n\
+\\n\
 \ Paragraphs are separated \n\
 \ by a blank line. \n\
 \\n\
@@ -23,9 +23,8 @@ testString = "## Sub-heading\n\
 \Horizontal rule:\n\
 \\n\
 \------\n\
-\\n\
-\1. Apple\n\
-\2. Banana"
+\* Apple\n\
+\* Banana"
 
 listTest = "1. Fooo\n2. Baaar"
 
@@ -41,7 +40,7 @@ startParsing = do
 -- This part can be extended, for example by adding a function for bullet lists. I would argue, that it makes sense to
 -- test at last for paragraphs.
 parseMD :: Parsec String () String
-parseMD = intercalate "\n"  <$> ((parseHeader <|> parseList <|> parseHorizontal <|> parseParagraph <|> many anyChar) `sepBy` newline)
+parseMD = intercalate "\n"  <$> ((parseHeader <|> parseList <|> parseHorizontal <|> parseParagraph <|> many anyChar) `sepBy` many1 newline)
 
 -- Is the current line a header
 parseHeader :: Parsec String () String
@@ -90,9 +89,10 @@ parseParagraph = do
 readParInput :: Parsec String () String
 readParInput = do
         content <- concat <$> many1 (many1 (noneOf "\n*`_ ") <|> parseAttribute <|> parseWhitespace)
-        nextLine <- try (do newline; lookAhead newline; return "\n") <|> (do lookAhead newline; newline; readParInput >>= (\tmp -> return ('\n':tmp))) <|> return ""
+        nextLine <- try (do newline; lookAhead newline; return "") <|> (do lookAhead newline; newline; readParInput >>= (\tmp -> return ('\n':tmp))) <|> return ""
         return (content ++ nextLine)
 
+-- Two whitespaces at the end of a line indicate a linebreak in html
 parseWhitespace :: Parsec String () String
 parseWhitespace =
         let checkForBr = char ' ' >> char ' ' >> newline
@@ -120,4 +120,4 @@ parseAttribute' tag = do
 
 
 parseHorizontal :: Parsec String () String
-parseHorizontal = many1 (char '-') >> lookAhead newline >> newline >> return "<hr />"
+parseHorizontal = many1 (char '-') >> lookAhead newline >> return "<hr />"

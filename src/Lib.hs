@@ -1,14 +1,17 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Lib where
 
+import Control.Monad (void)
+import Data.List (intercalate)
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import Text.ParserCombinators.Parsec hiding (try)
 import Text.Parsec.Prim
 import Text.Parsec.Char
-import Control.Monad (void)
-import Data.List (intercalate)
 
 -- Some test strings
-emptyTestString = ""
-testString = "## Sub-heading\n\
+emptyText = ""
+testText = "## Sub-heading\n\
 \\n\
 \Paragraphs are separated \n\
 \by a blank line. \n\
@@ -19,7 +22,7 @@ testString = "## Sub-heading\n\
 \Two spaces at the end of a line  \n\
 \produces a line break.\n\
 \\n\
-\Text attributes _italic_,\n\
+\T.Text attributes _italic_,\n\
 \**bold**, `monospace`.\n\
 \\n\
 \Horizontal rule:\n\
@@ -35,148 +38,148 @@ testString = "## Sub-heading\n\
 listTest = "1. Fooo\n2. Baaar\n\nfooooobar"
 imageTest = "![image](fff.png)"
 
-
 -- Start the parsing procedure
 startParsing :: IO ()
 startParsing = do
-        let r =  parse parseMD "" testString
+        --content <- T.getContents
+        let r =  parse parseMD "" testText
         case r of
-            Left _  -> putStrLn "Parsing went wrong"
-            Right h -> putStrLn h
+            Left _  -> T.putStrLn "Parsing went wrong"
+            Right h -> T.putStrLn h
 
 -- This part can be extended, for example by adding a function for bullet lists. I would argue, that it makes sense to
 -- test at last for paragraphs.
-parseMD :: Parsec String () String
-parseMD = intercalate "\n"  <$> ((parseHeader <|> parseList <|> parseHorizontal <|> parseBlockquote <|> parseParagraph <|> many anyChar) `sepBy` many1 newline)
+parseMD :: Parsec T.Text () T.Text
+parseMD = T.intercalate "\n"  <$> ((parseHeader <|> parseList <|> parseHorizontal <|> parseBlockquote <|> parseParagraph <|> return T.empty) `sepBy` many1 newline)
 
 -- Is the current line a header
-parseHeader :: Parsec String () String
+parseHeader :: Parsec T.Text () T.Text
 parseHeader = do
         lookAhead (char '#')
-        sectionLevel <- getHeaderLevel
-        cs <- spaces >> many1 (noneOf "\n")
-        return ("<h" ++ show sectionLevel ++ ">" ++ cs ++ "</h" ++ show sectionLevel ++ ">")
+        sectionLevel <- T.pack . show <$> getHeaderLevel
+        cs <- T.pack <$> (spaces >> many1 (noneOf "\n"))
+        return ("<h" `T.append` sectionLevel `T.append` ">" `T.append` cs `T.append` "</h" `T.append` sectionLevel `T.append` ">")
 
 -- Ask for the header level
-getHeaderLevel :: Parsec String () Int
+getHeaderLevel :: Parsec T.Text () Int
 getHeaderLevel = (do char '#'; getHeaderLevel >>= (\n -> return (n+1))) <|> return 0
 
 -- Parse lists
-parseList :: Parsec String () String
+parseList :: Parsec T.Text () T.Text
 parseList = do
         listType <- (lookAhead digit >> return "ol") <|> (lookAhead (char '*') >> return "ul")
         let
-            startTag   = "<" ++ listType ++ ">"
-            endTag   = "</" ++ listType ++ ">"
+            startTag   = "<" `T.append` listType `T.append` ">"
+            endTag   = "</" `T.append` listType `T.append` ">"
             in do
-                  items <- intercalate "\n" <$> many1 (parseListItem listType)
-                  return $ startTag ++ "\n" ++ init items ++ "\n" ++ endTag
+                  items <- T.intercalate "\n" <$> many1 (parseListItem listType)
+                  return $ startTag `T.append` "\n" `T.append` T.init items `T.append` "\n" `T.append` endTag
 
 -- Parse a list item
-parseListItem :: String -> Parsec String () String
+parseListItem :: T.Text -> Parsec T.Text () T.Text
 parseListItem listType =
                 if listType == "ol"
                     then digit >> char '.' >> spaces >> parseListContent listType
                     else char '*' >> spaces >> parseListContent listType
 
 -- Parse content of an item an call `parseListItem` again
-parseListContent :: String -> Parsec String () String
+parseListContent :: T.Text -> Parsec T.Text () T.Text
 parseListContent listType  =
         let
             startTag = "<li>"
             endTag   = "</li>"
             in
                 try (do
-                    content <- spaces >> many1 (noneOf "\n")
+                    content <- T.pack <$> (spaces >> many1 (noneOf "\n"))
                     restList <- parseUntilEmptyLine $ parseListItem listType
-                    return $ (startTag ++ content ++ endTag) ++ ('\n':restList)
+                    return $ (startTag `T.append` content `T.append` endTag) `T.append` ('\n' `T.cons` restList)
                     )
 
-parseUntilEmptyLine :: Parsec String () String -> Parsec String () String
+parseUntilEmptyLine :: Parsec T.Text () T.Text -> Parsec T.Text () T.Text
 parseUntilEmptyLine p =
-        try (do newline; lookAhead newline; return "") <|> try ((newline <* eof) >> return "") <|> (do lookAhead newline; newline; p) <|> try (do r <- p; (r++) <$> parseUntilEmptyLine p) <|> return ""
+        try (do newline; lookAhead newline; return T.empty) <|> try ((newline <* eof) >> return T.empty) <|> (do lookAhead newline; newline; p) <|> try (do r <- p; (r `T.append`) <$> parseUntilEmptyLine p) <|> return T.empty
 
 -- Parse a paragraph
-parseParagraph :: Parsec String () String
+parseParagraph :: Parsec T.Text () T.Text
 parseParagraph = do
         let startTag = "<p>"
             endTag   = "</p>"
         content <- (newline >> readParInput) <|> readParInput
-        return $ startTag ++ content ++ endTag
+        return $ startTag `T.append` content `T.append` endTag
 
 -- Parse content of a paragraph; search for attributes and the end of
 -- a parapgraph.
-readParInput :: Parsec String () String
+readParInput :: Parsec T.Text () T.Text
 readParInput = do
-        content <- concat <$> many1 (many1 (noneOf "\n*`_ ![") <|> parseAttribute <|> parseWhitespace <|> try parseImage <|> try parseLink)
+        content <- T.concat <$> many1 (T.pack <$> many1 (noneOf "\n*`_ ![") <|> parseAttribute <|> parseWhitespace <|> try parseImage <|> try parseLink)
         nextLine <- parseUntilEmptyLine readParInput
-        return (content ++ nextLine)
+        return (content `T.append` nextLine)
 
-parseLink :: Parsec String () String
+parseLink :: Parsec T.Text () T.Text
 parseLink =
         do
             string "["
-            linkName <- many (noneOf "]")
+            linkName <- T.pack <$> many (noneOf "]")
             char ']'
             char '('
-            link <- many (noneOf ")")
+            link <- T.pack <$> many (noneOf ")")
             char ')'
-            return $ "<a href = \"" ++ linkName ++ "\" src=\"" ++ link ++ "\"</a>"
+            return $ "<a href = \"" `T.append` linkName `T.append` "\" src=\"" `T.append` link `T.append` "\"</a>"
 
-parseImage :: Parsec String () String
+parseImage :: Parsec T.Text () T.Text
 parseImage =
         do
             string "!["
-            imageName <- many (noneOf "]")
+            imageName <- T.pack <$> many (noneOf "]")
             char ']'
             char '('
-            imageLink <- many (noneOf ")")
+            imageLink <- T.pack <$> many (noneOf ")")
             char ')'
-            return $ "<img alt = \"" ++ imageName ++ "\" src=\"" ++ imageLink ++ "\" />"
+            return $ "<img alt = \"" `T.append` imageName `T.append` "\" src=\"" `T.append` imageLink `T.append` "\" />"
 
 -- Two whitespaces at the end of a line indicate a linebreak in html
-parseWhitespace :: Parsec String () String
+parseWhitespace :: Parsec T.Text () T.Text
 parseWhitespace =
         let checkForBr = char ' ' >> char ' ' >> newline
             in try (checkForBr >> return "< /br>\n") <|> (char ' ' >> return " ")
 
 -- Parse any of the three given attributes
-parseAttribute :: Parsec String () String
+parseAttribute :: Parsec T.Text () T.Text
 parseAttribute = parseAttribute' "strong" <|> parseAttribute' "em" <|> parseAttribute' "code"
 
-parseAttribute' :: String -> Parsec String () String
+parseAttribute' :: T.Text -> Parsec T.Text () T.Text
 parseAttribute' tag = do
-        let startTag = "<"  ++ tag ++ ">"
-            endTag   = "</" ++ tag ++ ">"
+        let startTag = "<"  `T.append` tag `T.append` ">"
+            endTag   = "</" `T.append` tag `T.append` ">"
             specialChar = helper tag
 
         many1 (char specialChar)
-        boldedText <- many1 (noneOf (show specialChar))
+        boldedText <- T.pack <$> many1 (noneOf (show specialChar))
         many1 (char specialChar)
-        return $ startTag ++ boldedText ++ endTag
-        where helper :: String -> Char
+        return $ startTag `T.append` boldedText `T.append` endTag
+        where helper :: T.Text -> Char
               helper s
                 | s == "strong" = '*'
                 | s == "em" = '_'
                 | otherwise      = '`'
 
-parseHorizontal :: Parsec String () String
+parseHorizontal :: Parsec T.Text () T.Text
 parseHorizontal = many1 (char '-') >> lookAhead newline >> return "<hr />"
 
 -- Parse a blockquote. Use email style characters for blockquoting.
-parseBlockquote :: Parsec String () String
+parseBlockquote :: Parsec T.Text () T.Text
 parseBlockquote = do
         let
             startTag = "<blockquote>\n<p>"
             endTag   = "</p>\n</blockquote>"
         lookAhead (char '>')
         blockquote <- parseUntilEmptyLine parseBlockquoteContent
-        return (startTag ++ blockquote ++ endTag)
+        return (startTag `T.append` blockquote `T.append` endTag)
 
-parseBlockquoteContent :: Parsec String () String
+parseBlockquoteContent :: Parsec T.Text () T.Text
 parseBlockquoteContent = do
         char '>' >> spaces
-        (++ " ") . concat <$> many1 (many1 (noneOf "<>&\n")
+        (`T.snoc` ' ') . T.pack . concat <$> many1 (many1 (noneOf "<>&\n")
                 <|> (char '>' >> return "&gt;")
                 <|> (char '<' >> return "&lt;")
                 <|> (char '&' >> return "&amp;"))

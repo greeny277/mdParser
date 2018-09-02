@@ -51,7 +51,7 @@ parseHeader :: Parsec String () String
 parseHeader = do
         lookAhead (char '#')
         sectionLevel <- getHeaderLevel
-        cs <- many1 (noneOf "\n")
+        cs <- spaces >> many1 (noneOf "\n")
         return ("<h" ++ show sectionLevel ++ ">" ++ cs ++ "</h" ++ show sectionLevel ++ ">")
 
 -- Ask for the header level

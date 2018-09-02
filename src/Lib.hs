@@ -28,14 +28,14 @@ parseMD = T.intercalate "\n"  <$>
           <|> parseBlockquote
           <|> parseParagraph
           <|> T.pack <$> many1 anyChar)
-            `sepEndBy` many1 (newline >> skipMany (space <|> tab)))
+            `sepEndBy` many1 (newline *> skipMany (space <|> tab)))
 
 -- Is the current line a header
 parseHeader :: Parsec T.Text () T.Text
 parseHeader = do
         lookAhead (char '#')
         sectionLevel <- T.pack . show <$> getHeaderLevel
-        cs <- T.pack <$> (spaces >> many1 (noneOf "\n"))
+        cs <- T.pack <$> (spaces *> many1 (noneOf "\n"))
         return (
               "<h" `T.append` sectionLevel `T.append` ">"
               `T.append` cs `T.append`
@@ -48,7 +48,7 @@ getHeaderLevel = (do char '#'; getHeaderLevel >>= (\n -> return (n+1))) <|> retu
 -- Parse lists
 parseList :: Parsec T.Text () T.Text
 parseList = do
-        listType <- (lookAhead digit >> return "ol") <|> (lookAhead (char '*') >> return "ul")
+        listType <- (lookAhead digit *> return "ol") <|> (lookAhead (char '*') *> return "ul")
         let
             startTag   = "<" `T.append` listType `T.append` ">"
             endTag   = "</" `T.append` listType `T.append` ">"
@@ -61,8 +61,8 @@ parseList = do
 parseListItem :: T.Text -> Parsec T.Text () T.Text
 parseListItem listType =
                 if listType == "ol"
-                    then digit >> char '.' >> spaces >> parseListContent listType
-                    else char '*' >> spaces >> parseListContent listType
+                    then digit *> char '.' *> spaces *> parseListContent listType
+                    else char '*' *> spaces *> parseListContent listType
 
 -- Parse content of an item an call `parseListItem` again
 parseListContent :: T.Text -> Parsec T.Text () T.Text
@@ -72,7 +72,7 @@ parseListContent listType  =
             endTag   = "</li>"
             in
                 try (do
-                    content <- T.pack <$> (spaces >> many1 (noneOf "\n"))
+                    content <- T.pack <$> (spaces *> many1 (noneOf "\n"))
                     restList <- parseUntilEmptyLine $ parseListItem listType
                     return $ (startTag `T.append` content `T.append` endTag)
                         `T.append` ('\n' `T.cons` restList)
@@ -81,7 +81,7 @@ parseListContent listType  =
 parseUntilEmptyLine :: Parsec T.Text () T.Text -> Parsec T.Text () T.Text
 parseUntilEmptyLine p =
         try (do newline; lookAhead newline; return T.empty)
-                <|> try ((newline <* eof) >> return T.empty)
+                <|> try ((newline <* eof) *> return T.empty)
                 <|> (do lookAhead newline; newline; skipMany (space <|> tab); p)
                 <|> try (do r <- p; (r `T.append`) <$> parseUntilEmptyLine p)
                 <|> return T.empty
@@ -91,7 +91,7 @@ parseParagraph :: Parsec T.Text () T.Text
 parseParagraph = do
         let startTag = "<p>"
             endTag   = "</p>"
-        content <- (newline >> readParInput) <|> readParInput
+        content <- (newline *> readParInput) <|> readParInput
         return $ startTag `T.append` content `T.append` endTag
 
 -- Parse content of a paragraph; search for attributes and the end of
@@ -132,8 +132,8 @@ parseImage =
 -- Two whitespaces at the end of a line indicate a linebreak in html
 parseWhitespace :: Parsec T.Text () T.Text
 parseWhitespace =
-        let checkForBr = char ' ' >> char ' ' >> newline
-            in try (checkForBr >> return "< /br>\n") <|> (char ' ' >> return " ")
+        let checkForBr = char ' ' *> char ' ' *> newline
+            in try (checkForBr *> return "< /br>\n") <|> (char ' ' *> return " ")
 
 -- Parse any of the three given attributes
 parseAttribute :: Parsec T.Text () T.Text
@@ -156,7 +156,7 @@ parseAttribute' tag = do
                 | otherwise      = '`'
 
 parseHorizontal :: Parsec T.Text () T.Text
-parseHorizontal = many1 (char '-') >> lookAhead newline >> return "<hr />"
+parseHorizontal = many1 (char '-') *> lookAhead newline *> return "<hr />"
 
 -- Parse a blockquote. Use email style characters for blockquoting.
 parseBlockquote :: Parsec T.Text () T.Text
@@ -170,8 +170,8 @@ parseBlockquote = do
 
 parseBlockquoteContent :: Parsec T.Text () T.Text
 parseBlockquoteContent = do
-        char '>' >> spaces
+        char '>' *> spaces
         (`T.snoc` ' ') . T.pack . concat <$> many1 (many1 (noneOf "<>&\n")
-                <|> (char '>' >> return "&gt;")
-                <|> (char '<' >> return "&lt;")
-                <|> (char '&' >> return "&amp;"))
+                <|> (char '>' *> return "&gt;")
+                <|> (char '<' *> return "&lt;")
+                <|> (char '&' *> return "&amp;"))

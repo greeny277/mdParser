@@ -92,6 +92,17 @@ readParInput = do
         nextLine <- try (do newline; lookAhead newline; return "") <|> (do lookAhead newline; newline; readParInput >>= (\tmp -> return ('\n':tmp))) <|> return ""
         return (content ++ nextLine)
 
+parseImage :: Parsec String () String
+parseImage =
+        try (do
+            string "!["
+            imageName <- many (noneOf "]")
+            char ']'
+            char '('
+            imageLink <- many (noneOf ")")
+            char ')'
+            return $ "<img alt = \"" ++ imageName ++ "\" src=\"" ++ imageLink ++ "\" />"
+            )
 -- Two whitespaces at the end of a line indicate a linebreak in html
 parseWhitespace :: Parsec String () String
 parseWhitespace =

@@ -9,40 +9,6 @@ import Text.ParserCombinators.Parsec hiding (try)
 import Text.Parsec.Prim
 import Text.Parsec.Char
 
--- Some test strings
-emptyText = ""
-testText = "## Sub-heading\n\
-\\n\
-\Paragraphs are separated \n\
-\by a blank line. \n\
-\\n\
-\![image](fff.png)\n\
-\\n\
-\[link](www.google.com)\n\
-\Two spaces at the end of a line  \n\
-\produces a line break.\n\
-\\n\
-\T.Text attributes _italic_,\n\
-\**bold**, `monospace`.\n\
-\\n\
-\Horizontal rule:\n\
-\\n\
-\------\n\
-\\n\
-\       * Apple\n\
-\       * Banana\n\
-\\n\
-\> Very blockquote > < &  ? * & +(*^^\n\
-\> Much more blockquote\n\
-\\n\
-\Numbered List:\n\
-\\n\
-\1. One\n\
-\2. Two"
-
-listTest = "1. Fooo\n2. Baaar\n\nfooooobar"
-imageTest = "![image](fff.png)"
-
 -- Start the parsing procedure
 startParsing :: IO ()
 startParsing = do

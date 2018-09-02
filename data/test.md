@@ -33,3 +33,5 @@ A [link](http://example.com).
 
 > Fooooo > < ? ! * & = +_)(*&^%$#@!
 > Baaar
+
+Inline <abbr title="Hypertext Markup Language">HTML</abbr> is supported.

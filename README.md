@@ -5,7 +5,7 @@ Author
 
 Name: Christian Bay
 
-Mail: christian.bay@posteo.de
+Mail: christian.bay [at] posteo.de
 
 Tools
 ---

@@ -29,11 +29,16 @@ testText = "## Sub-heading\n\
 \\n\
 \------\n\
 \\n\
-\* Apple\n\
-\* Banana\n\
+\       * Apple\n\
+\       * Banana\n\
 \\n\
-\> Very blockquote > < &\n\
-\> Much more blockquote"
+\> Very blockquote > < &  ? * & +(*^^\n\
+\> Much more blockquote\n\
+\\n\
+\Numbered List:\n\
+\\n\
+\1. One\n\
+\2. Two"
 
 listTest = "1. Fooo\n2. Baaar\n\nfooooobar"
 imageTest = "![image](fff.png)"
@@ -41,16 +46,16 @@ imageTest = "![image](fff.png)"
 -- Start the parsing procedure
 startParsing :: IO ()
 startParsing = do
-        --content <- T.getContents
-        let r =  parse parseMD "" testText
+        content <- T.getContents
+        let r =  parse parseMD "" content
         case r of
             Left _  -> T.putStrLn "Parsing went wrong"
-            Right h -> T.putStrLn h
+            Right h -> T.putStr h
 
 -- This part can be extended, for example by adding a function for bullet lists. I would argue, that it makes sense to
 -- test at last for paragraphs.
 parseMD :: Parsec T.Text () T.Text
-parseMD = T.intercalate "\n"  <$> ((parseHeader <|> parseList <|> parseHorizontal <|> parseBlockquote <|> parseParagraph <|> return T.empty) `sepBy` many1 newline)
+parseMD = T.intercalate "\n"  <$> ((parseHeader <|> parseList <|> parseHorizontal <|> parseBlockquote <|> parseParagraph <|> return T.empty) `sepBy` many1 (newline >> skipMany (space <|> tab)))
 
 -- Is the current line a header
 parseHeader :: Parsec T.Text () T.Text
@@ -97,7 +102,7 @@ parseListContent listType  =
 
 parseUntilEmptyLine :: Parsec T.Text () T.Text -> Parsec T.Text () T.Text
 parseUntilEmptyLine p =
-        try (do newline; lookAhead newline; return T.empty) <|> try ((newline <* eof) >> return T.empty) <|> (do lookAhead newline; newline; p) <|> try (do r <- p; (r `T.append`) <$> parseUntilEmptyLine p) <|> return T.empty
+        try (do newline; lookAhead newline; return T.empty) <|> try ((newline <* eof) >> return T.empty) <|> (do lookAhead newline; newline; skipMany (space <|> tab); p) <|> try (do r <- p; (r `T.append`) <$> parseUntilEmptyLine p) <|> return T.empty
 
 -- Parse a paragraph
 parseParagraph :: Parsec T.Text () T.Text

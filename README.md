@@ -24,7 +24,7 @@ stack build
 To exec the tool use:
 
 ``` bash
-stack exec mdParser-exe
+cat SomeMarkdownfile.md | stack exec mdParser-exe
 ```
 
 About

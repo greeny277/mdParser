@@ -10,11 +10,12 @@ import Data.List (intercalate)
 emptyTestString = ""
 testString = "## Sub-heading\n\
 \\n\
-\ Paragraphs are separated \n\
-\ by a blank line. \n\
+\Paragraphs are separated \n\
+\by a blank line. \n\
 \\n\
 \![image](fff.png)\n\
 \\n\
+\[link](www.google.com)\n\
 \Two spaces at the end of a line  \n\
 \produces a line break.\n\
 \\n\
@@ -26,9 +27,7 @@ testString = "## Sub-heading\n\
 \------\n\
 \\n\
 \* Apple\n\
-\* Banana\n\
-\\n\
-\fooo ![image](fff.png) baaar\n"
+\* Banana\n"
 
 listTest = "1. Fooo\n2. Baaar\n\nfooooobar"
 imageTest = "![image](fff.png)"
@@ -87,12 +86,12 @@ parseListContent listType  =
                 try (do
                     content <- spaces >> many1 (noneOf "\n")
                     restList <- parseUntilEmptyLine $ parseListItem listType
-                    return $ (startTag ++ content ++ endTag) ++  restList
+                    return $ (startTag ++ content ++ endTag) ++ ('\n':restList)
                     )
 
 parseUntilEmptyLine :: Parsec String () String -> Parsec String () String
 parseUntilEmptyLine p =
-        try (do newline; lookAhead newline; return "") <|> try ((newline <* eof) >> return "") <|> (do lookAhead newline; newline; p >>= (\tmp -> return ('\n':tmp))) <|> return ""
+        try (do newline; lookAhead newline; return "") <|> try ((newline <* eof) >> return "") <|> (do lookAhead newline; newline; p) <|> return ""
 
 -- Parse a paragraph
 parseParagraph :: Parsec String () String
@@ -106,13 +105,24 @@ parseParagraph = do
 -- a parapgraph.
 readParInput :: Parsec String () String
 readParInput = do
-        content <- concat <$> many1 (many1 (noneOf "\n*`_ !") <|> parseAttribute <|> parseWhitespace <|> parseImage)
+        content <- concat <$> many1 (many1 (noneOf "\n*`_ ![") <|> parseAttribute <|> parseWhitespace <|> try parseImage <|> try parseLink)
         nextLine <- parseUntilEmptyLine readParInput
         return (content ++ nextLine)
 
+parseLink :: Parsec String () String
+parseLink =
+        do
+            string "["
+            linkName <- many (noneOf "]")
+            char ']'
+            char '('
+            link <- many (noneOf ")")
+            char ')'
+            return $ "<a href = \"" ++ linkName ++ "\" src=\"" ++ link ++ "\"</a>"
+
 parseImage :: Parsec String () String
 parseImage =
-        try (do
+        do
             string "!["
             imageName <- many (noneOf "]")
             char ']'
@@ -120,12 +130,12 @@ parseImage =
             imageLink <- many (noneOf ")")
             char ')'
             return $ "<img alt = \"" ++ imageName ++ "\" src=\"" ++ imageLink ++ "\" />"
-            )
+
 -- Two whitespaces at the end of a line indicate a linebreak in html
 parseWhitespace :: Parsec String () String
 parseWhitespace =
         let checkForBr = char ' ' >> char ' ' >> newline
-            in try (checkForBr >> return "< /br>") <|> (char ' ' >> return " ")
+            in try (checkForBr >> return "< /br>\n") <|> (char ' ' >> return " ")
 
 -- Parse any of the three given attributes
 parseAttribute :: Parsec String () String
@@ -146,7 +156,6 @@ parseAttribute' tag = do
                 | s == "strong" = '*'
                 | s == "em" = '_'
                 | otherwise      = '`'
-
 
 parseHorizontal :: Parsec String () String
 parseHorizontal = many1 (char '-') >> lookAhead newline >> return "<hr />"

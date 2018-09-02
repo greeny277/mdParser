@@ -50,12 +50,12 @@ startParsing = do
         let r =  parse parseMD "" content
         case r of
             Left _  -> T.putStrLn "Parsing went wrong"
-            Right h -> T.putStr h
+            Right h -> T.putStrLn h
 
 -- This part can be extended, for example by adding a function for bullet lists. I would argue, that it makes sense to
 -- test at last for paragraphs.
 parseMD :: Parsec T.Text () T.Text
-parseMD = T.intercalate "\n"  <$> ((parseHeader <|> parseList <|> parseHorizontal <|> parseBlockquote <|> parseParagraph <|> return T.empty) `sepBy` many1 (newline >> skipMany (space <|> tab)))
+parseMD = T.intercalate "\n"  <$> ((parseHeader <|> parseList <|> parseHorizontal <|> parseBlockquote <|> parseParagraph <|> T.pack <$> many1 anyChar) `sepEndBy` many1 (newline >> skipMany (space <|> tab)))
 
 -- Is the current line a header
 parseHeader :: Parsec T.Text () T.Text

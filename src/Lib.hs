@@ -21,7 +21,14 @@ startParsing = do
 -- This part can be extended, for example by adding a function for bullet lists. I would argue, that it makes sense to
 -- test at last for paragraphs.
 parseMD :: Parsec T.Text () T.Text
-parseMD = T.intercalate "\n"  <$> ((parseHeader <|> parseList <|> parseHorizontal <|> parseBlockquote <|> parseParagraph <|> T.pack <$> many1 anyChar) `sepEndBy` many1 (newline >> skipMany (space <|> tab)))
+parseMD = T.intercalate "\n"  <$>
+            ((parseHeader
+          <|> parseList
+          <|> parseHorizontal
+          <|> parseBlockquote
+          <|> parseParagraph
+          <|> T.pack <$> many1 anyChar)
+            `sepEndBy` many1 (newline >> skipMany (space <|> tab)))
 
 -- Is the current line a header
 parseHeader :: Parsec T.Text () T.Text
@@ -29,7 +36,10 @@ parseHeader = do
         lookAhead (char '#')
         sectionLevel <- T.pack . show <$> getHeaderLevel
         cs <- T.pack <$> (spaces >> many1 (noneOf "\n"))
-        return ("<h" `T.append` sectionLevel `T.append` ">" `T.append` cs `T.append` "</h" `T.append` sectionLevel `T.append` ">")
+        return (
+              "<h" `T.append` sectionLevel `T.append` ">"
+              `T.append` cs `T.append`
+              "</h" `T.append` sectionLevel `T.append` ">")
 
 -- Ask for the header level
 getHeaderLevel :: Parsec T.Text () Int
@@ -44,7 +54,8 @@ parseList = do
             endTag   = "</" `T.append` listType `T.append` ">"
             in do
                   items <- T.intercalate "\n" <$> many1 (parseListItem listType)
-                  return $ startTag `T.append` "\n" `T.append` T.init items `T.append` "\n" `T.append` endTag
+                  return $ startTag `T.append` "\n"
+                     `T.append` T.init items `T.append` "\n" `T.append` endTag
 
 -- Parse a list item
 parseListItem :: T.Text -> Parsec T.Text () T.Text
@@ -63,12 +74,17 @@ parseListContent listType  =
                 try (do
                     content <- T.pack <$> (spaces >> many1 (noneOf "\n"))
                     restList <- parseUntilEmptyLine $ parseListItem listType
-                    return $ (startTag `T.append` content `T.append` endTag) `T.append` ('\n' `T.cons` restList)
+                    return $ (startTag `T.append` content `T.append` endTag)
+                        `T.append` ('\n' `T.cons` restList)
                     )
 
 parseUntilEmptyLine :: Parsec T.Text () T.Text -> Parsec T.Text () T.Text
 parseUntilEmptyLine p =
-        try (do newline; lookAhead newline; return T.empty) <|> try ((newline <* eof) >> return T.empty) <|> (do lookAhead newline; newline; skipMany (space <|> tab); p) <|> try (do r <- p; (r `T.append`) <$> parseUntilEmptyLine p) <|> return T.empty
+        try (do newline; lookAhead newline; return T.empty)
+                <|> try ((newline <* eof) >> return T.empty)
+                <|> (do lookAhead newline; newline; skipMany (space <|> tab); p)
+                <|> try (do r <- p; (r `T.append`) <$> parseUntilEmptyLine p)
+                <|> return T.empty
 
 -- Parse a paragraph
 parseParagraph :: Parsec T.Text () T.Text
@@ -82,7 +98,12 @@ parseParagraph = do
 -- a parapgraph.
 readParInput :: Parsec T.Text () T.Text
 readParInput = do
-        content <- T.concat <$> many1 (T.pack <$> many1 (noneOf "\n*`_ ![") <|> parseAttribute <|> parseWhitespace <|> try parseImage <|> try parseLink)
+        content <- T.concat
+            <$> many1 (T.pack <$> many1 (noneOf "\n*`_ ![")
+            <|> parseAttribute
+            <|> parseWhitespace
+            <|> try parseImage
+            <|> try parseLink)
         nextLine <- parseUntilEmptyLine readParInput
         return (content `T.append` nextLine)
 

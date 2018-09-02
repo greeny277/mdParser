@@ -27,7 +27,10 @@ testString = "## Sub-heading\n\
 \------\n\
 \\n\
 \* Apple\n\
-\* Banana\n"
+\* Banana\n\
+\\n\
+\> Very blockquote > < &\n\
+\> Much more blockquote"
 
 listTest = "1. Fooo\n2. Baaar\n\nfooooobar"
 imageTest = "![image](fff.png)"
@@ -44,7 +47,7 @@ startParsing = do
 -- This part can be extended, for example by adding a function for bullet lists. I would argue, that it makes sense to
 -- test at last for paragraphs.
 parseMD :: Parsec String () String
-parseMD = intercalate "\n"  <$> ((parseHeader <|> parseList <|> parseHorizontal <|> parseParagraph <|> many anyChar) `sepBy` many1 newline)
+parseMD = intercalate "\n"  <$> ((parseHeader <|> parseList <|> parseHorizontal <|> parseBlockquote <|> parseParagraph <|> many anyChar) `sepBy` many1 newline)
 
 -- Is the current line a header
 parseHeader :: Parsec String () String
@@ -91,7 +94,7 @@ parseListContent listType  =
 
 parseUntilEmptyLine :: Parsec String () String -> Parsec String () String
 parseUntilEmptyLine p =
-        try (do newline; lookAhead newline; return "") <|> try ((newline <* eof) >> return "") <|> (do lookAhead newline; newline; p) <|> return ""
+        try (do newline; lookAhead newline; return "") <|> try ((newline <* eof) >> return "") <|> (do lookAhead newline; newline; p) <|> try (do r <- p; (r++) <$> parseUntilEmptyLine p) <|> return ""
 
 -- Parse a paragraph
 parseParagraph :: Parsec String () String
@@ -159,3 +162,21 @@ parseAttribute' tag = do
 
 parseHorizontal :: Parsec String () String
 parseHorizontal = many1 (char '-') >> lookAhead newline >> return "<hr />"
+
+-- Parse a blockquote. Use email style characters for blockquoting.
+parseBlockquote :: Parsec String () String
+parseBlockquote = do
+        let
+            startTag = "<blockquote>\n<p>"
+            endTag   = "</p>\n</blockquote>"
+        lookAhead (char '>')
+        blockquote <- parseUntilEmptyLine parseBlockquoteContent
+        return (startTag ++ blockquote ++ endTag)
+
+parseBlockquoteContent :: Parsec String () String
+parseBlockquoteContent = do
+        char '>' >> spaces
+        (++ " ") . concat <$> many1 (many1 (noneOf "<>&\n")
+                <|> (char '>' >> return "&gt;")
+                <|> (char '<' >> return "&lt;")
+                <|> (char '&' >> return "&amp;"))

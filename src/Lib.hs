@@ -13,6 +13,7 @@ testString = "## Sub-heading\n\
 \ Paragraphs are separated \n\
 \ by a blank line. \n\
 \\n\
+\![image](fff.png)\n\
 \\n\
 \Two spaces at the end of a line  \n\
 \produces a line break.\n\
@@ -23,10 +24,14 @@ testString = "## Sub-heading\n\
 \Horizontal rule:\n\
 \\n\
 \------\n\
+\\n\
 \* Apple\n\
-\* Banana"
+\* Banana\n\
+\\n\
+\![image](fff.png)\n"
 
-listTest = "1. Fooo\n2. Baaar"
+listTest = "1. Fooo\n2. Baaar\n\nfooooobar"
+imageTest = "![image](fff.png)"
 
 
 -- Start the parsing procedure
@@ -62,18 +67,30 @@ parseList = do
             startTag   = "<" ++ listType ++ ">"
             endTag   = "</" ++ listType ++ ">"
             in do
-                  items <- intercalate "\n" <$> parseListItem `sepBy` newline
-                  return $ startTag ++ "\n" ++ items ++ "\n" ++ endTag
+                  items <- intercalate "\n" <$> many1 (parseListItem listType)
+                  return $ startTag ++ "\n" ++ init items ++ "\n" ++ endTag
 
-parseListItem :: Parsec String () String
-parseListItem =
+parseListItem :: String -> Parsec String () String
+parseListItem listType =
+                if listType == "ol"
+                    then digit >> char '.' >> spaces >> parseListContent listType
+                    else char '*' >> spaces >> parseListContent listType
+
+parseListContent :: String -> Parsec String () String
+parseListContent listType  =
         let
-            startTag   = "<li>"
+            startTag = "<li>"
             endTag   = "</li>"
-            in do
-                (char '*' <|> (digit >> char '.')) >> spaces
-                content <- many (noneOf "\n")
-                return $ startTag ++ content ++ endTag
+            in
+                try (do
+                    content <- spaces >> many1 (noneOf "\n")
+                    restList <- parseUntilEmptyLine $ parseListItem listType
+                    return $ (startTag ++ content ++ endTag) ++  restList
+                    )
+
+parseUntilEmptyLine :: Parsec String () String -> Parsec String () String
+parseUntilEmptyLine p =
+        try (do newline; lookAhead newline; return "") <|> try ((newline <* eof) >> return "") <|> (do lookAhead newline; newline; p >>= (\tmp -> return ('\n':tmp))) <|> return ""
 
 
 -- Parse a paragraph
@@ -88,8 +105,8 @@ parseParagraph = do
 -- a parapgraph.
 readParInput :: Parsec String () String
 readParInput = do
-        content <- concat <$> many1 (many1 (noneOf "\n*`_ ") <|> parseAttribute <|> parseWhitespace)
-        nextLine <- try (do newline; lookAhead newline; return "") <|> (do lookAhead newline; newline; readParInput >>= (\tmp -> return ('\n':tmp))) <|> return ""
+        content <- concat <$> many1 (many1 (noneOf "\n*`_ !") <|> parseAttribute <|> parseWhitespace <|> parseImage)
+        nextLine <- parseUntilEmptyLine readParInput
         return (content ++ nextLine)
 
 parseImage :: Parsec String () String

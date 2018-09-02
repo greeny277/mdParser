@@ -28,7 +28,7 @@ testString = "## Sub-heading\n\
 \* Apple\n\
 \* Banana\n\
 \\n\
-\![image](fff.png)\n"
+\fooo ![image](fff.png) baaar\n"
 
 listTest = "1. Fooo\n2. Baaar\n\nfooooobar"
 imageTest = "![image](fff.png)"
@@ -70,12 +70,14 @@ parseList = do
                   items <- intercalate "\n" <$> many1 (parseListItem listType)
                   return $ startTag ++ "\n" ++ init items ++ "\n" ++ endTag
 
+-- Parse a list item
 parseListItem :: String -> Parsec String () String
 parseListItem listType =
                 if listType == "ol"
                     then digit >> char '.' >> spaces >> parseListContent listType
                     else char '*' >> spaces >> parseListContent listType
 
+-- Parse content of an item an call `parseListItem` again
 parseListContent :: String -> Parsec String () String
 parseListContent listType  =
         let
@@ -91,7 +93,6 @@ parseListContent listType  =
 parseUntilEmptyLine :: Parsec String () String -> Parsec String () String
 parseUntilEmptyLine p =
         try (do newline; lookAhead newline; return "") <|> try ((newline <* eof) >> return "") <|> (do lookAhead newline; newline; p >>= (\tmp -> return ('\n':tmp))) <|> return ""
-
 
 -- Parse a paragraph
 parseParagraph :: Parsec String () String
